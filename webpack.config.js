@@ -26,29 +26,33 @@ module.exports = {
   output: {
     filename: '[name].js',
     path: path.resolve(__dirname, 'dist'),
-    clean: true, // This will clean the dist folder before each build
+    clean: true,
   },
   plugins: [
     new Dotenv({
-      systemvars: true, // Load all system environment variables as well
+      systemvars: true,
     }),
     new CopyPlugin({
       patterns: [
-        { 
-          from: "public", 
-          to: ".",
-          globOptions: {
-            ignore: ["**/manifest.json"],
+        {
+          from: "manifest.json",
+          to: "manifest.json",
+          transform(content) {
+            const jsonContent = JSON.parse(content);
+            jsonContent.background.service_worker = "dist/background.js";
+            jsonContent.content_scripts[0].js = ["dist/content.js"];
+            jsonContent.icons = {
+              "16": "dist/icons/icon16.png",
+              "48": "dist/icons/icon48.png",
+              "128": "dist/icons/icon128.png"
+            };
+            if (jsonContent.web_accessible_resources) {
+              jsonContent.web_accessible_resources[0].resources = ["dist/index.js"];
+            }
+            return JSON.stringify(jsonContent, null, 2);
           },
         },
-        {
-          from: "public/manifest.json",
-          to: "manifest.json",
-        },
-        {
-          from: "public/icons",
-          to: "icons"
-        },
+        { from: "public/icons", to: "icons" },
       ],
     }),
   ],
