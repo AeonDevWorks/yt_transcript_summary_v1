@@ -85,37 +85,15 @@ function injectReactComponent() {
       console.log('Target element found');
       
       // Check if the container already exists
-      let container = document.getElementById('yt-transcriber-container');
+      let container = document.getElementById('yt-transcriber-container-adw');
       
       if (!container) {
         console.log('Creating new container');
         container = document.createElement('div');
-        container.id = 'yt-transcriber-container';
+        container.id = 'yt-transcriber-container-adw';
         container.style.width = '100%';
         container.style.marginBottom = '16px';
-        container.style.maxHeight = '360px'; // Set max height to match YouTube player
-        container.style.overflowY = 'auto'; // Make container scrollable
-        container.style.scrollbarWidth = 'thin'; // For Firefox
-        container.style.scrollbarColor = '#888 #f1f1f1'; // For Firefox
         
-        // Add custom scrollbar styles for WebKit browsers (Chrome, Safari)
-        const style = document.createElement('style');
-        style.textContent = `
-          #yt-transcriber-container::-webkit-scrollbar {
-            width: 8px;
-          }
-          #yt-transcriber-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-          }
-          #yt-transcriber-container::-webkit-scrollbar-thumb {
-            background: #888;
-          }
-          #yt-transcriber-container::-webkit-scrollbar-thumb:hover {
-            background: #555;
-          }
-        `;
-        document.head.appendChild(style);
-
         targetElement.prepend(container);
       } else {
         console.log('Container already exists, updating content');
