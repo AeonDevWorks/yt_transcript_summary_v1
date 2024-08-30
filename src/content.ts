@@ -13,32 +13,104 @@ declare global {
   }
 }
 
-function injectReactComponent() {
-  console.log('Attempting to inject React component');
-  const targetElement = document.querySelector('#secondary');
-  if (targetElement) {
-    console.log('Target element found, creating container');
-    const container = document.createElement('div');
-    container.id = 'yt-transcriber-container';
-    targetElement.prepend(container);
+interface TranscriptChunk {
+  title?: string;
+  timestamp: string;
+  startTime: number;
+  text: string;
+}
 
-    // Use Trusted Types if supported
-    if (window.trustedTypes && window.trustedTypes.createPolicy) {
-      console.log('Using Trusted Types');
-      const policy = window.trustedTypes.createPolicy('react-html', {
-        createHTML: (html) => html
-      });
-      const root = createRoot(container);
-      root.render(React.createElement(TranscriptDisplay));
-      container.innerHTML = policy.createHTML(container.innerHTML);
-    } else {
-      console.log('Trusted Types not supported, rendering normally');
-      const root = createRoot(container);
-      root.render(React.createElement(TranscriptDisplay));
-    }
-    console.log('React component injected');
+interface FormattedTranscript {
+  hasChapters: boolean;
+  chunks: TranscriptChunk[];
+}
+
+function formatTranscript(parsedCaptions: any[], chapters: any[]): FormattedTranscript {
+  if (chapters && chapters.length > 0) {
+    console.log('Formatting transcript with chapters:', chapters);
+    // Format with chapters
+    const formattedChunks: TranscriptChunk[] = chapters.map((chapter, index) => {
+      const nextChapterStart = chapters[index + 1] ? chapters[index + 1].timeRangeStartMillis : Infinity;
+      const chapterCaptions = parsedCaptions.filter(
+        caption => caption.start * 1000 >= chapter.timeRangeStartMillis && caption.start * 1000 < nextChapterStart
+      );
+      console.log(`Chapter ${index + 1}:`, { chapter, chapterCaptions });
+      return {
+        title: chapter.title,
+        timestamp: formatTimestamp(chapter.timeRangeStartMillis / 1000),
+        startTime: chapter.timeRangeStartMillis / 1000,
+        text: chapterCaptions.map(caption => caption.text).join(' ')
+      };
+    });
+    return { hasChapters: true, chunks: formattedChunks };
   } else {
-    console.log('Target element not found');
+    // Format into logical chunks with timestamps
+    const chunkSize = 15; // Number of captions per chunk
+    const formattedChunks: TranscriptChunk[] = [];
+    for (let i = 0; i < parsedCaptions.length; i += chunkSize) {
+      const chunk = parsedCaptions.slice(i, i + chunkSize);
+      formattedChunks.push({
+        timestamp: formatTimestamp(chunk[0].start),
+        startTime: chunk[0].start,
+        text: chunk.map(caption => caption.text).join(' ')
+      });
+    }
+    return { hasChapters: false, chunks: formattedChunks };
+  }
+}
+
+function formatTimestamp(seconds: number): string {
+  if (!isFinite(seconds)) return '00:00';
+  seconds = Math.max(0, Math.floor(seconds));
+  const hh = Math.floor(seconds / 3600);
+  const mm = Math.floor((seconds % 3600) / 60);
+  const ss = seconds % 60;
+  if (hh > 0) {
+    return `${hh}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+  }
+  return `${mm}:${ss.toString().padStart(2, '0')}`;
+}
+
+function injectReactComponent(transcript: FormattedTranscript) {
+  console.log('Attempting to inject React component');
+  
+  const inject = () => {
+    const targetElement = document.querySelector('#secondary');
+    if (targetElement) {
+      console.log('Target element found, creating container');
+      const container = document.createElement('div');
+      container.id = 'yt-transcriber-container';
+      container.style.width = '100%';
+      container.style.marginBottom = '16px';
+      targetElement.prepend(container);
+
+      const root = createRoot(container);
+      root.render(React.createElement(TranscriptDisplay, { transcript }));
+      console.log('React component injected');
+    } else {
+      console.log('Target element not found');
+    }
+  };
+
+  // Try to inject immediately
+  inject();
+
+  // If it fails, set up a MutationObserver to wait for the #secondary element
+  if (!document.querySelector('#secondary')) {
+    console.log('Setting up MutationObserver for #secondary');
+    const observer = new MutationObserver((mutations, obs) => {
+      const targetElement = document.querySelector('#secondary');
+      if (targetElement) {
+        console.log('#secondary found, injecting component');
+        inject();
+        obs.disconnect(); // Stop observing once injected
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 }
 
@@ -65,7 +137,7 @@ async function fetchAndParseCaptions(captionTrackUrl: string) {
   const textElements = xmlDoc.getElementsByTagName('text');
 
   const parsedCaptions = Array.from(textElements).map((element) => ({
-    text: element.textContent || '',
+    text: element.textContent?.replace(/&#39;/g, "'").replace(/&quot;/g, '"') || '',
     start: parseFloat(element.getAttribute('start') || '0'),
     duration: parseFloat(element.getAttribute('dur') || '0'),
   }));
@@ -94,22 +166,29 @@ async function main() {
           if (response.captionsAvailable) {
             console.log('Captions available, fetching and parsing');
             const parsedCaptions = await fetchAndParseCaptions(response.captionTrackUrl);
-            const transcriptData = {
-              captions: parsedCaptions,
-              chapters: response.chapters
-            };
-            console.log('Transcript data:', transcriptData);
-            // You might want to update your React component state here
+            const formattedTranscript = formatTranscript(parsedCaptions, response.chapters);
+            console.log('Formatted transcript:', formattedTranscript);
+            
+            // Inject the React component with the formatted transcript
+            injectReactComponent(formattedTranscript);
           } else {
             console.log('Captions not available');
+            injectReactComponent({ hasChapters: false, chunks: [] });
           }
         } else {
           console.error('Error fetching video data:', response.error);
+          // Create a formatted transcript with an error message
+          injectReactComponent({
+            hasChapters: false,
+            chunks: [{
+              timestamp: '',
+              startTime: 0,
+              text: 'Error fetching video data.'
+            }]
+          });
         }
       });
     }
-    console.log('Injecting React component');
-    injectReactComponent();
   } else {
     console.log('Not a YouTube video page, skipping');
   }
