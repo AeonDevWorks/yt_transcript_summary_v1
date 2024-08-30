@@ -5,6 +5,7 @@
   "description": "Transcribe and summarize YouTube videos",
   "permissions": [
     "activeTab",
+    "storage",
     "scripting"
   ],
   "host_permissions": [
