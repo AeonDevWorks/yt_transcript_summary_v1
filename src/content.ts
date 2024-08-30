@@ -71,7 +71,12 @@ function formatTimestamp(seconds: number): string {
   return `${mm}:${ss.toString().padStart(2, '0')}`;
 }
 
-function injectReactComponent(transcript: FormattedTranscript) {
+interface TranscriptState {
+  isLoading: boolean;
+  transcript: FormattedTranscript | null;
+}
+
+function injectReactComponent() {
   console.log('Attempting to inject React component');
   
   const inject = () => {
@@ -117,7 +122,7 @@ function injectReactComponent(transcript: FormattedTranscript) {
       }
 
       const root = createRoot(container);
-      root.render(React.createElement(TranscriptDisplay, { transcript }));
+      root.render(React.createElement(TranscriptDisplay, { fetchTranscript }));
       console.log('React component injected or updated');
     } else {
       console.log('Target element not found');
@@ -144,6 +149,30 @@ function injectReactComponent(transcript: FormattedTranscript) {
       subtree: true
     });
   }
+}
+
+async function fetchTranscript(): Promise<TranscriptState> {
+  const videoId = new URLSearchParams(window.location.search).get('v');
+  if (!videoId) {
+    return { isLoading: false, transcript: null };
+  }
+
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'fetchVideoData', videoId }, async (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error fetching video data:', chrome.runtime.lastError);
+        resolve({ isLoading: false, transcript: null });
+        return;
+      }
+      if (response.success && response.captionsAvailable) {
+        const parsedCaptions = await fetchAndParseCaptions(response.captionTrackUrl);
+        const formattedTranscript = formatTranscript(parsedCaptions, response.chapters);
+        resolve({ isLoading: false, transcript: formattedTranscript });
+      } else {
+        resolve({ isLoading: false, transcript: null });
+      }
+    });
+  });
 }
 
 // Check if we're on a YouTube video page
@@ -194,31 +223,11 @@ async function main() {
         if (response.success) {
           console.log('Video data fetched successfully');
           updateExtensionBadge(response.captionsAvailable ? 'CC' : '');
-          
-          if (response.captionsAvailable) {
-            console.log('Captions available, fetching and parsing');
-            const parsedCaptions = await fetchAndParseCaptions(response.captionTrackUrl);
-            const formattedTranscript = formatTranscript(parsedCaptions, response.chapters);
-            console.log('Formatted transcript:', formattedTranscript);
-            
-            // Inject the React component with the formatted transcript
-            injectReactComponent(formattedTranscript);
-          } else {
-            console.log('Captions not available');
-            injectReactComponent({ hasChapters: false, chunks: [] });
-          }
         } else {
           console.error('Error fetching video data:', response.error);
-          // Create a formatted transcript with an error message
-          injectReactComponent({
-            hasChapters: false,
-            chunks: [{
-              timestamp: '',
-              startTime: 0,
-              text: 'Error fetching video data.'
-            }]
-          });
         }
+        // Inject the React component regardless of the response
+        injectReactComponent();
       });
     }
   } else {
