@@ -3,6 +3,15 @@ import { Button } from './ui/button';
 import { Spinner } from './ui/spinner';
 import FunctionButtons, { FunctionButtonsProps } from './FunctionButtons';
 import { useTheme, ThemeProvider } from './ThemeProvider';
+import { summarizeTranscript } from '../lib/aiSummarizer';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import AIOverlayPanel from './AIOverlayPanel';
+
 
 interface TranscriptChunk {
   title?: string;
@@ -36,6 +45,10 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
   const transcriptRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLDivElement>(null);
+  const [showAISummary, setShowAISummary] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [cachedSummaries, setCachedSummaries] = useState<Record<string, string>>({});
 
   const toggleExpand = useCallback(() => {
     setIsExpanded(!isExpanded);
@@ -77,7 +90,11 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
   };
 
   const handleCopy = () => {
-    if (transcriptState.transcript) {
+    if (showAISummary && aiSummary) {
+      navigator.clipboard.writeText(aiSummary).then(() => {
+        alert('AI Summary copied to clipboard!');
+      });
+    } else if (transcriptState.transcript) {
       const text = transcriptState.transcript.chunks.map(chunk => chunk.text).join('\n');
       navigator.clipboard.writeText(text).then(() => {
         alert('Transcript copied to clipboard!');
@@ -102,9 +119,37 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
     }
   };
 
-  const handleSummarize = () => {
-    // This is a placeholder. In a real implementation, you'd call an AI service to summarize the transcript.
-    alert('Summarize functionality not implemented yet.');
+  const handleSummarize = async () => {
+    setShowAISummary(true);
+    setAiSummary(null);
+    setSummaryError(null);
+
+    if (transcriptState.transcript) {
+      const videoId = new URLSearchParams(window.location.search).get('v');
+      if (videoId && cachedSummaries[videoId]) {
+        setAiSummary(cachedSummaries[videoId]);
+      } else {
+        try {
+          const fullTranscript = transcriptState.transcript.chunks.map(chunk => chunk.text).join(' ');
+          const summary = await summarizeTranscript(fullTranscript);
+          setAiSummary(summary);
+          if (videoId) {
+            setCachedSummaries(prev => ({ ...prev, [videoId]: summary }));
+          }
+        } catch (error) {
+          console.error('Failed to generate summary:', error);
+          setSummaryError('Failed to generate summary. Please try again.');
+        }
+      }
+    }
+  };
+
+  const handleRetrySummary = () => {
+    handleSummarize();
+  };
+
+  const handleCloseSummary = () => {
+    setShowAISummary(false);
   };
 
   const handleFontSize = () => {
@@ -149,7 +194,7 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
   return (
     <div 
       ref={containerRef}
-      className={`transcript-container-adw w-full rounded-lg shadow-lg overflow-hidden flex flex-col border-4 ${
+      className={`transcript-container-adw w-full rounded-lg shadow-lg overflow-hidden flex flex-col border-4 relative ${
         theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-zinc-100 text-black border-gray-200'
       }`} 
       style={{ maxHeight: '480px' }}
@@ -165,54 +210,70 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
             onToggleTheme={toggleTheme}
             theme={theme}
           />
-          <div 
-            ref={textAreaRef} 
-            className={`transcript-text-adw p-4 overflow-y-auto flex-grow ${getFontSizeClass()} ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
-            }`}
-            style={{ backgroundColor: getBackgroundColor() }}
-          >
-            {transcriptState.isLoading ? (
-              <div className="flex justify-center items-center h-16 mt-2">
-                <Spinner size={32} />
-              </div>
-            ) : transcriptState.transcript ? (
-              transcriptState.transcript.chunks.map((chunk, index) => (
-                <div 
-                  key={index} 
-                  className={`transcript-chunk-adw mb-4 p-2 rounded transition-colors duration-500 ${
-                    currentChunkId === `chunk-adw-${chunk.startTime}` 
-                      ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200')
-                      : ''
-                  }`} 
-                  id={`chunk-adw-${chunk.startTime}`}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <button
-                      onClick={() => seekToTime(chunk.startTime)}
-                      className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-300 px-2 py-1 rounded ${
-                        theme === 'dark'
-                          ? 'bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200'
-                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300 hover:text-black'
-                      }`}
-                    >
-                      {chunk.timestamp}
-                    </button>
-                    {transcriptState.transcript?.hasChapters && chunk.title && (
-                      <h3 className={`chapter-title-adw font-bold text-xl transition-colors duration-300 ${
-                        theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
-                      }`}>{chunk.title}</h3>
-                    )}
-                  </div>
-                  <p className={`chunk-text-adw transition-colors duration-300 ${
-                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                  }`}>{chunk.text}</p>
+          <div className="relative flex-grow overflow-hidden">
+            <div 
+              ref={textAreaRef} 
+              className={`transcript-text-adw p-4 overflow-y-auto h-full ${getFontSizeClass()} ${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
+              }`}
+              style={{ 
+                backgroundColor: getBackgroundColor(),
+                maxHeight: 'calc(480px - 56px)' // Subtracting the height of the function buttons
+              }}
+            >
+              {transcriptState.isLoading ? (
+                <div className="flex justify-center items-center h-16 mt-2">
+                  <Spinner size={32} />
                 </div>
-              ))
-            ) : (
-              <p className={`mt-2 transition-colors duration-300 ${
-                theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-              }`}>No transcript available for this video.</p>
+              ) : transcriptState.transcript ? (
+                transcriptState.transcript.chunks.map((chunk, index) => (
+                  <div 
+                    key={index} 
+                    className={`transcript-chunk-adw mb-4 p-2 rounded transition-colors duration-500 ${
+                      currentChunkId === `chunk-adw-${chunk.startTime}` 
+                        ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200')
+                        : ''
+                    }`} 
+                    id={`chunk-adw-${chunk.startTime}`}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <button
+                        onClick={() => seekToTime(chunk.startTime)}
+                        className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-300 px-2 py-1 rounded ${
+                          theme === 'dark'
+                            ? 'bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200'
+                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300 hover:text-black'
+                        }`}
+                      >
+                        {chunk.timestamp}
+                      </button>
+                      {transcriptState.transcript?.hasChapters && chunk.title && (
+                        <h3 className={`chapter-title-adw font-bold text-xl transition-colors duration-300 ${
+                          theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
+                        }`}>{chunk.title}</h3>
+                      )}
+                    </div>
+                    <p className={`chunk-text-adw transition-colors duration-300 ${
+                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                    }`}>{chunk.text}</p>
+                  </div>
+                ))
+              ) : (
+                <p className={`mt-2 transition-colors duration-300 ${
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+                }`}>No transcript available for this video.</p>
+              )}
+            </div>
+            {showAISummary && (
+              <AIOverlayPanel
+                theme={theme}
+                aiSummary={aiSummary}
+                summaryError={summaryError}
+                handleCloseSummary={handleCloseSummary}
+                handleRetrySummary={handleRetrySummary}
+                getFontSizeClass={getFontSizeClass}
+                getBackgroundColor={getBackgroundColor}
+              />
             )}
           </div>
         </>

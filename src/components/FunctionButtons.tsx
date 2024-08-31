@@ -1,5 +1,12 @@
 import React from 'react';
 import { Button } from './ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
 
 export interface FunctionButtonsProps {
   onCopy: () => void;
@@ -30,24 +37,78 @@ const FunctionButtons: React.FC<FunctionButtonsProps> = ({
     <div className={`flex justify-between items-center p-2 ${
       theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
     }`}>
-      <Button onClick={onCopy} variant="ghost" size="sm" className={buttonClass} title="Copy transcript">
-        <CopyIcon />
-      </Button>
-      <Button onClick={onGoToCurrentTime} variant="ghost" size="sm" className={buttonClass} title="Go to current time">
-        <CurrentTimeIcon />
-      </Button>
-      <Button onClick={onSummarize} variant="ghost" size="sm" className={buttonClass} title="Summarize with AI">
-        <SummarizeIcon />
-      </Button>
-      <Button onClick={onToggleTheme} variant="ghost" size="sm" className={buttonClass} title="Toggle theme">
-        <ThemeIcon theme={theme} />
-      </Button>
-      <Button onClick={onFontSize} variant="ghost" size="sm" className={buttonClass} title="Adjust font size">
-        <FontSizeIcon />
-      </Button>
-      <Button onClick={onCollapse} variant="ghost" size="sm" className={buttonClass} title="Collapse transcript">
-        <ChevronUpIcon />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onCopy} variant="ghost" size="sm" className={buttonClass}>
+              <CopyIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Copy transcript</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onGoToCurrentTime} variant="ghost" size="sm" className={buttonClass}>
+              <CurrentTimeIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Go to current time</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onSummarize} variant="ghost" size="sm" className={buttonClass}>
+              <AISparkleIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Summarize with AI</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onToggleTheme} variant="ghost" size="sm" className={buttonClass}>
+              <ThemeIcon theme={theme} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Toggle theme</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onFontSize} variant="ghost" size="sm" className={buttonClass}>
+              <FontSizeIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Adjust font size</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={onCollapse} variant="ghost" size="sm" className={buttonClass}>
+              <ChevronUpIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Collapse transcript</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 };
@@ -93,6 +154,15 @@ const FontSizeIcon = () => (
 const ChevronUpIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+);
+
+const AISparkleIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {/* Large sparkle */}
+    <path d="M12 2C12 2 14 6 16 8C18 10 22 12 22 12C22 12 18 14 16 16C14 18 12 22 12 22C12 22 10 18 8 16C6 14 2 12 2 12C2 12 6 10 8 8C10 6 12 2 12 2Z" />
+    {/* Small sparkle */}
+    <path d="M19 2C19 2 20 3 21 4C22 5 23 6 23 6C23 6 22 7 21 8C20 9 19 10 19 10C19 10 18 9 17 8C16 7 15 6 15 6C15 6 16 5 17 4C18 3 19 2 19 2Z" />
   </svg>
 );
 
