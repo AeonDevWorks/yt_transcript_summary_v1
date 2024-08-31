@@ -1,7 +1,5 @@
 import React from 'react';
 import { Button } from './ui/button';
-import { useTheme } from './ThemeProvider';
-import { Theme } from './ThemeProvider';
 
 export interface FunctionButtonsProps {
   onCopy: () => void;
@@ -22,26 +20,32 @@ const FunctionButtons: React.FC<FunctionButtonsProps> = ({
   onToggleTheme,
   theme,
 }) => {
-  const { toggleTheme } = useTheme();
+  const buttonClass = `p-2 w-14 h-14 flex items-center justify-center transition-colors duration-300 rounded ${
+    theme === 'dark'
+      ? 'bg-gray-700 text-gray-200 hover:bg-gray-600 hover:text-white'
+      : 'bg-gray-200 text-gray-800 hover:bg-gray-300 hover:text-black'
+  }`;
 
   return (
-    <div className="flex justify-between items-center p-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-      <Button onClick={onCopy} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Copy transcript">
+    <div className={`flex justify-between items-center p-2 ${
+      theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
+    }`}>
+      <Button onClick={onCopy} variant="ghost" size="sm" className={buttonClass} title="Copy transcript">
         <CopyIcon />
       </Button>
-      <Button onClick={onGoToCurrentTime} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Go to current time">
+      <Button onClick={onGoToCurrentTime} variant="ghost" size="sm" className={buttonClass} title="Go to current time">
         <CurrentTimeIcon />
       </Button>
-      <Button onClick={onSummarize} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Summarize with AI">
+      <Button onClick={onSummarize} variant="ghost" size="sm" className={buttonClass} title="Summarize with AI">
         <SummarizeIcon />
       </Button>
-      <Button onClick={toggleTheme} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Toggle theme">
+      <Button onClick={onToggleTheme} variant="ghost" size="sm" className={buttonClass} title="Toggle theme">
         <ThemeIcon theme={theme} />
       </Button>
-      <Button onClick={onFontSize} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Adjust font size">
+      <Button onClick={onFontSize} variant="ghost" size="sm" className={buttonClass} title="Adjust font size">
         <FontSizeIcon />
       </Button>
-      <Button onClick={onCollapse} variant="ghost" size="sm" className="p-2 w-14 h-14 flex items-center justify-center" title="Collapse transcript">
+      <Button onClick={onCollapse} variant="ghost" size="sm" className={buttonClass} title="Collapse transcript">
         <ChevronUpIcon />
       </Button>
     </div>

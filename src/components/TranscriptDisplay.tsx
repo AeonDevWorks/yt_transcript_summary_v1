@@ -31,9 +31,11 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
     isLoading: false,
     transcript: null,
   });
-  const [fontSize, setFontSize] = useState('medium');
+  const [fontSize, setFontSize] = useState('xl');
   const [currentChunkId, setCurrentChunkId] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textAreaRef = useRef<HTMLDivElement>(null);
 
   const toggleExpand = useCallback(() => {
     setIsExpanded(!isExpanded);
@@ -106,7 +108,7 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
   };
 
   const handleFontSize = () => {
-    const sizes = ['base', 'lg', 'xl'];
+    const sizes = ['lg', 'xl', '2xl'];
     const currentIndex = sizes.indexOf(fontSize);
     const nextSize = sizes[(currentIndex + 1) % sizes.length];
     setFontSize(nextSize);
@@ -114,23 +116,44 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
 
   const getFontSizeClass = () => {
     switch (fontSize) {
-      case 'base': return 'text-base';
-      case 'xl': return 'text-xl';
-      default: return 'text-lg';
+      case 'lg': return 'text-lg';
+      case '2xl': return 'text-2xl';
+      default: return 'text-xl';
     }
   };
 
   const { theme, toggleTheme } = useTheme();
+
+  const getBackgroundColor = () => {
+    return theme === 'dark' ? '#3f3f3f' : '#f1f1f1'; // bg-gray-800 for dark, bg-gray-100 for light
+    // return theme === 'dark' ? '#1f2937' : '#f3f4f6'; // bg-gray-800 for dark, bg-gray-100 for light
+  };
 
   // Add this useEffect to handle theme changes
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  useEffect(() => {
+    const debugStyles = (element: HTMLElement | null, description: string) => {
+      if (element) {
+        console.log(`${description} computed background-color:`, window.getComputedStyle(element).backgroundColor);
+        console.log(`${description} classList:`, element.classList);
+      }
+    };
+
+    debugStyles(containerRef.current, 'Container');
+    debugStyles(textAreaRef.current, 'Text area');
+  }, [theme]);
+
   return (
-    <div className={`transcript-container-adw w-full rounded-lg shadow-lg overflow-hidden flex flex-col border-4 ${
-      theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-white text-gray-900 border-gray-200'
-    }`} style={{ maxHeight: '480px' }}>
+    <div 
+      ref={containerRef}
+      className={`transcript-container-adw w-full rounded-lg shadow-lg overflow-hidden flex flex-col border-4 ${
+        theme === 'dark' ? 'bg-gray-800 text-white border-gray-700' : 'bg-zinc-100 text-black border-gray-200'
+      }`} 
+      style={{ maxHeight: '480px' }}
+    >
       {isExpanded ? (
         <>
           <FunctionButtons
@@ -142,9 +165,13 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
             onToggleTheme={toggleTheme}
             theme={theme}
           />
-          <div ref={transcriptRef} className={`transcript-text-adw p-4 overflow-y-auto flex-grow ${getFontSizeClass()} ${
-            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-          }`}>
+          <div 
+            ref={textAreaRef} 
+            className={`transcript-text-adw p-4 overflow-y-auto flex-grow ${getFontSizeClass()} ${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
+            }`}
+            style={{ backgroundColor: getBackgroundColor() }}
+          >
             {transcriptState.isLoading ? (
               <div className="flex justify-center items-center h-16 mt-2">
                 <Spinner size={32} />
@@ -155,7 +182,7 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
                   key={index} 
                   className={`transcript-chunk-adw mb-4 p-2 rounded transition-colors duration-500 ${
                     currentChunkId === `chunk-adw-${chunk.startTime}` 
-                      ? (theme === 'dark' ? 'bg-gray-600' : 'bg-gray-200')
+                      ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200')
                       : ''
                   }`} 
                   id={`chunk-adw-${chunk.startTime}`}
@@ -163,27 +190,27 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
                   <div className="flex justify-between items-center mb-2">
                     <button
                       onClick={() => seekToTime(chunk.startTime)}
-                      className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-200 hover:shadow-md ${
+                      className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-300 px-2 py-1 rounded ${
                         theme === 'dark'
-                          ? 'text-blue-400 hover:text-blue-300'
-                          : 'text-blue-600 hover:text-blue-800'
+                          ? 'bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300 hover:text-black'
                       }`}
                     >
                       {chunk.timestamp}
                     </button>
                     {transcriptState.transcript?.hasChapters && chunk.title && (
-                      <h3 className={`chapter-title-adw font-bold text-xl ${
+                      <h3 className={`chapter-title-adw font-bold text-xl transition-colors duration-300 ${
                         theme === 'dark' ? 'text-gray-100' : 'text-gray-900'
                       }`}>{chunk.title}</h3>
                     )}
                   </div>
-                  <p className={`chunk-text-adw ${
-                    theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
+                  <p className={`chunk-text-adw transition-colors duration-300 ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
                   }`}>{chunk.text}</p>
                 </div>
               ))
             ) : (
-              <p className={`mt-2 ${
+              <p className={`mt-2 transition-colors duration-300 ${
                 theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
               }`}>No transcript available for this video.</p>
             )}
