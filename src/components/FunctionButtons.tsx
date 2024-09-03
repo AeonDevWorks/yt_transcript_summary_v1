@@ -7,7 +7,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-
 export interface FunctionButtonsProps {
   onCopy: () => void;
   onGoToCurrentTime: () => void;
@@ -77,11 +76,11 @@ const FunctionButtons: React.FC<FunctionButtonsProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button onClick={onToggleTheme} variant="ghost" size="sm" className={buttonClass}>
-              <ThemeIcon theme={theme} />
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Toggle theme</p>
+            <p>Toggle theme (Current: {theme})</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -163,6 +162,26 @@ const AISparkleIcon = () => (
     <path d="M12 2C12 2 14 6 16 8C18 10 22 12 22 12C22 12 18 14 16 16C14 18 12 22 12 22C12 22 10 18 8 16C6 14 2 12 2 12C2 12 6 10 8 8C10 6 12 2 12 2Z" />
     {/* Small sparkle */}
     <path d="M19 2C19 2 20 3 21 4C22 5 23 6 23 6C23 6 22 7 21 8C20 9 19 10 19 10C19 10 18 9 17 8C16 7 15 6 15 6C15 6 16 5 17 4C18 3 19 2 19 2Z" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5"></circle>
+    <line x1="12" y1="1" x2="12" y2="3"></line>
+    <line x1="12" y1="21" x2="12" y2="23"></line>
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+    <line x1="1" y1="12" x2="3" y2="12"></line>
+    <line x1="21" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 

@@ -1,7 +1,10 @@
+import './tailwind.css';  // This file will contain only Tailwind directives
+
 import React from 'react';
 import ReactDOM from 'react-dom';
-import TranscriptDisplay from './components/TranscriptDisplay';
+import TranscriptDisplay, { TranscriptState, TranscriptDisplayProps } from './components/TranscriptDisplay';
 import { createRoot } from 'react-dom/client';
+import { ThemeProvider } from './components/ThemeProvider';  // Add this import
 
 console.log('Content script loaded');
 
@@ -10,6 +13,7 @@ declare global {
     trustedTypes?: {
       createPolicy: (name: string, rules: { createHTML: (html: string) => string }) => { createHTML: (html: string) => string };
     };
+    setTheme?: (theme: string) => void;
   }
 }
 
@@ -71,12 +75,7 @@ function formatTimestamp(seconds: number): string {
   return `${mm}:${ss.toString().padStart(2, '0')}`;
 }
 
-interface TranscriptState {
-  isLoading: boolean;
-  transcript: FormattedTranscript | null;
-}
-
-function injectReactComponent() {
+function injectReactComponent(transcriptState: TranscriptState) {
   console.log('Attempting to inject React component');
   
   const inject = () => {
@@ -100,12 +99,32 @@ function injectReactComponent() {
       }
 
       const root = createRoot(container);
-      root.render(React.createElement(TranscriptDisplay, { fetchTranscript }));
+      root.render(
+        React.createElement(
+          React.StrictMode,
+          null,
+          React.createElement(
+            ThemeProvider,
+            null,
+            React.createElement(TranscriptDisplay, { fetchTranscript, transcriptState } as TranscriptDisplayProps)
+          )
+        )
+      );
       console.log('React component injected or updated');
+
+      container.dataset.reactRoot = 'true';
     } else {
       console.log('Target element not found');
     }
   };
+
+  // Clean up existing React root if it exists
+  const existingContainer = document.getElementById('yt-transcriber-container-adw');
+  if (existingContainer && existingContainer.dataset.reactRoot) {
+    const root = createRoot(existingContainer);
+    root.unmount();
+    console.log('Unmounted existing React root');
+  }
 
   // Try to inject immediately
   inject();
@@ -185,31 +204,45 @@ async function fetchAndParseCaptions(captionTrackUrl: string) {
 }
 
 // Main function to run when the page loads
-async function main() {
+function main() {
   console.log('Main function called');
-  if (isYouTubeVideoPage()) {
-    const videoId = new URLSearchParams(window.location.search).get('v');
-    console.log('Video ID:', videoId);
-    if (videoId) {
-      console.log('Sending fetchVideoData message to background');
-      chrome.runtime.sendMessage({ action: 'fetchVideoData', videoId }, async (response) => {
-        console.log('Received response from background:', response);
-        if (chrome.runtime.lastError) {
-          console.error('Error fetching video data:', chrome.runtime.lastError);
-          return;
-        }
-        if (response.success) {
-          console.log('Video data fetched successfully');
-          updateExtensionBadge(response.captionsAvailable ? 'CC' : '');
-        } else {
-          console.error('Error fetching video data:', response.error);
-        }
-        // Inject the React component regardless of the response
-        injectReactComponent();
-      });
-    }
+  
+  // Reset extension state (including clearing saved theme)
+  resetExtensionState();
+
+  // Check if we're on a YouTube watch page
+  if (location.pathname.startsWith('/watch')) {
+    console.log('On YouTube watch page, fetching transcript');
+    // Fetch transcript and inject React component
+    fetchTranscript().then((transcriptState) => {
+      injectReactComponent(transcriptState);
+    }).catch((error) => {
+      console.error('Error fetching transcript:', error);
+      // Inject React component even if transcript fetch fails
+      injectReactComponent({ isLoading: false, transcript: null });
+    });
   } else {
-    console.log('Not a YouTube video page, skipping');
+    console.log('Not on YouTube watch page');
+    // Clean up any existing React components
+    cleanupReactComponent();
+  }
+}
+
+function resetExtensionState() {
+  console.log('Resetting extension state');
+  // Clear saved theme
+  localStorage.removeItem('yt-transcriber-theme');
+  // Reset any other state variables or UI elements as needed
+}
+
+// Function to clean up React component
+function cleanupReactComponent() {
+  const container = document.getElementById('yt-transcriber-container-adw');
+  if (container && container.dataset.reactRoot) {
+    const root = createRoot(container);
+    root.unmount();
+    container.remove();
+    console.log('Cleaned up React component');
   }
 }
 
