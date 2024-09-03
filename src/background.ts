@@ -1,6 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+console.log('Background script loading');
 
-console.log('Background script loaded');
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import './lib/transcriptFetcher';
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("YouTube Transcriber installed");

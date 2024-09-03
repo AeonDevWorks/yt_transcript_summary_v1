@@ -1,12 +1,14 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const Dotenv = require('dotenv-webpack');
+// const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 module.exports = {
+  mode: 'development',
   entry: {
-    background: './src/background.ts',
     content: './src/content.ts',
-    index: './src/index.ts'
+    background: './src/background.ts',
+    index: './src/index.ts',
   },
   module: {
     rules: [
@@ -29,9 +31,26 @@ module.exports = {
   },
   output: {
     filename: '[name].js',
+    // chunkFilename: '[name].chunk.js',
     path: path.resolve(__dirname, 'dist'),
     clean: true,
   },
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      maxInitialRequests: Infinity,
+      minSize: 0,
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+      },
+    },
+    minimize: true
+  },
+  devtool: 'cheap-source-map',
   plugins: [
     new Dotenv({
       systemvars: true,
@@ -40,7 +59,7 @@ module.exports = {
       patterns: [
         {
           from: "manifest.json",
-          to: "manifest.json",
+          to: "manifest.json", 
           transform(content) {
             const jsonContent = JSON.parse(content);
             jsonContent.background.service_worker = "dist/background.js";
@@ -51,7 +70,10 @@ module.exports = {
               "128": "dist/icons/icon128.png"
             };
             if (jsonContent.web_accessible_resources) {
-              jsonContent.web_accessible_resources[0].resources = ["dist/index.js"];
+              jsonContent.web_accessible_resources[0].resources = [
+                "dist/index.js",
+                "dist/*.js" // Add this line to include all chunk files
+              ];
             }
             return JSON.stringify(jsonContent, null, 2);
           },
@@ -59,5 +81,6 @@ module.exports = {
         { from: "public/icons", to: "icons" },
       ],
     }),
+    // new BundleAnalyzerPlugin()
   ],
 };

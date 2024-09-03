@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useTheme } from './ThemeProvider';
 
-interface AIOverlayPanelProps {
+export interface AIOverlayPanelProps {
   theme: string;
   aiSummary: string | null;
   summaryError: string | null;

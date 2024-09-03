@@ -20,8 +20,12 @@
     "baseUrl": "src",
     "paths": {
       "@/*": ["./*"]
-    }
+    },
+    "types": ["chrome", "node"]
   },
-  "include": ["src/**/*"],
+  "include": [
+    "src/**/*",
+    "src/types/**/*.d.ts"
+  ],
   "exclude": ["node_modules"]
 }

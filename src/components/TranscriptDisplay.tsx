@@ -4,34 +4,10 @@ import { Spinner } from './ui/spinner';
 import FunctionButtons from './FunctionButtons';
 import { useTheme } from './ThemeProvider';
 import { summarizeTranscript } from '../lib/aiSummarizer';
-import AIOverlayPanel from './AIOverlayPanel';
+import { TranscriptDisplayProps, TranscriptState } from './TranscriptDisplayTypes';
 
-// At the top of the file, add these exports
-export interface TranscriptState {
-  isLoading: boolean;
-  transcript: FormattedTranscript | null;
-}
-
-export interface FormattedTranscript {
-  hasChapters: boolean;
-  chunks: TranscriptChunk[];
-}
-
-export interface TranscriptChunk {
-  title?: string;
-  timestamp: string;
-  startTime: number;
-  text: string;
-}
-
-export interface TranscriptDisplayProps {
-  fetchTranscript: () => Promise<TranscriptState>;
-}
-
-const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }) => {
+const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript, transcriptState, AIOverlayPanel, onCollapse }) => {
   const { theme, toggleTheme } = useTheme();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [transcriptState, setTranscriptState] = useState<TranscriptState>({ isLoading: false, transcript: null });
   const [currentChunkId, setCurrentChunkId] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState<'lg' | 'xl' | '2xl'>('xl');
   const [showAISummary, setShowAISummary] = useState(false);
@@ -41,19 +17,6 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLDivElement>(null);
-
-  const toggleExpand = useCallback(() => {
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
-
-  useEffect(() => {
-    if (isExpanded && !transcriptState.transcript && !transcriptState.isLoading) {
-      setTranscriptState(prevState => ({ ...prevState, isLoading: true }));
-      fetchTranscript().then(newState => {
-        setTranscriptState(newState);
-      });
-    }
-  }, [isExpanded, transcriptState, fetchTranscript]);
 
   const seekToTime = (time: number) => {
     const video = document.querySelector('video');
@@ -147,6 +110,12 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
     toggleTheme();
   }, [theme, toggleTheme]);
 
+  const handleCollapse = useCallback(() => {
+    if (onCollapse) {
+      onCollapse();
+    }
+  }, [onCollapse]);
+
   useEffect(() => {
     console.log('TranscriptDisplay: Current theme after theme change:', theme);
   }, [theme]);
@@ -159,73 +128,73 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
         ${theme === 'dark' ? 'bg-[#0f0f0f] text-[#f1f1f1] border-gray-700' : 'bg-white text-[#0f0f0f] border-gray-200'}`}
       style={{ maxHeight: '480px' }}
     >
-      {isExpanded ? (
-        <>
-          <FunctionButtons
-            onCopy={handleCopy}
-            onGoToCurrentTime={handleGoToCurrentTime}
-            onSummarize={handleSummarize}
-            onFontSize={handleFontSize}
-            onCollapse={toggleExpand}
-            onToggleTheme={handleToggleTheme}
-            theme={theme}
-          />
-          <div className="relative flex-grow overflow-hidden">
-            <div 
-              ref={textAreaRef} 
-              className={`transcript-text-adw p-4 overflow-y-auto h-full ${getFontSizeClass()} ${
-                getThemeClass('bg-[#0f0f0f]', 'bg-white')
-              }`}
-              style={{ 
-                maxHeight: 'calc(480px - 56px)' // Subtracting the height of the function buttons
-              }}
-            >
-              {transcriptState.isLoading ? (
-                <div className="flex justify-center items-center h-16 mt-2">
-                  <Spinner size={32} />
-                </div>
-              ) : transcriptState.transcript ? (
-                transcriptState.transcript.chunks.map((chunk, index) => (
-                  <div 
-                    key={index} 
-                    className={`transcript-chunk-adw mb-4 p-2 rounded transition-colors duration-500 ${
-                      currentChunkId === `chunk-adw-${chunk.startTime}` 
-                        ? getThemeClass('bg-gray-700', 'bg-gray-200')
-                        : ''
-                    }`} 
-                    id={`chunk-adw-${chunk.startTime}`}
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <button
-                        onClick={() => seekToTime(chunk.startTime)}
-                        className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-300 px-2 py-1 rounded ${
-                          getThemeClass(
-                            'bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200',
-                            'bg-gray-200 text-blue-600 hover:bg-gray-300 hover:text-blue-700'
-                          )
-                        }`}
-                      >
-                        {chunk.timestamp}
-                      </button>
-                      {transcriptState.transcript?.hasChapters && chunk.title && (
-                        <h3 className={`chapter-title-adw font-bold text-xl transition-colors duration-300 ${
-                          getThemeClass('text-gray-100', 'text-gray-900')
-                        }`}>{chunk.title}</h3>
-                      )}
-                    </div>
-                    <p className={`chunk-text-adw transition-colors duration-300 ${
-                      getThemeClass('text-gray-300', 'text-gray-700')
-                    }`}>{chunk.text}</p>
+      <>
+        <FunctionButtons
+          onCopy={handleCopy}
+          onGoToCurrentTime={handleGoToCurrentTime}
+          onSummarize={handleSummarize}
+          onFontSize={handleFontSize}
+          onToggleTheme={handleToggleTheme}
+          onCollapse={handleCollapse}
+          theme={theme}
+        />
+        <div className="relative flex-grow overflow-hidden">
+          <div 
+            ref={textAreaRef} 
+            className={`transcript-text-adw p-4 overflow-y-auto h-full ${getFontSizeClass()} ${
+              getThemeClass('bg-[#0f0f0f]', 'bg-white')
+            }`}
+            style={{ 
+              maxHeight: 'calc(480px - 56px)' // Subtracting the height of the function buttons
+            }}
+          >
+            {transcriptState.isLoading ? (
+              <div className="flex justify-center items-center h-16 mt-2">
+                <Spinner size={32} />
+              </div>
+            ) : transcriptState.transcript ? (
+              transcriptState.transcript.chunks.map((chunk, index) => (
+                <div 
+                  key={index} 
+                  className={`transcript-chunk-adw mb-4 p-2 rounded transition-colors duration-500 ${
+                    currentChunkId === `chunk-adw-${chunk.startTime}` 
+                      ? getThemeClass('bg-gray-700', 'bg-gray-200')
+                      : ''
+                  }`} 
+                  id={`chunk-adw-${chunk.startTime}`}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <button
+                      onClick={() => seekToTime(chunk.startTime)}
+                      className={`timestamp-button-adw text-base cursor-pointer transition-colors duration-300 px-2 py-1 rounded ${
+                        getThemeClass(
+                          'bg-gray-700 text-blue-300 hover:bg-gray-600 hover:text-blue-200',
+                          'bg-gray-200 text-blue-600 hover:bg-gray-300 hover:text-blue-700'
+                        )
+                      }`}
+                    >
+                      {chunk.timestamp}
+                    </button>
+                    {transcriptState.transcript?.hasChapters && chunk.title && (
+                      <h3 className={`chapter-title-adw font-bold text-xl transition-colors duration-300 ${
+                        getThemeClass('text-gray-100', 'text-gray-900')
+                      }`}>{chunk.title}</h3>
+                    )}
                   </div>
-                ))
-              ) : (
-                <p className={`mt-2 transition-colors duration-300 ${
-                  getThemeClass('text-gray-200', 'text-gray-800')
-                }`}>No transcript available for this video.</p>
-              )}
-            </div>
+                  <p className={`chunk-text-adw transition-colors duration-300 ${
+                    getThemeClass('text-gray-300', 'text-gray-700')
+                  }`}>{chunk.text}</p>
+                </div>
+              ))
+            ) : (
+              <p className={`mt-2 transition-colors duration-300 ${
+                getThemeClass('text-gray-200', 'text-gray-800')
+              }`}>No transcript available for this video.</p>
+            )}
           </div>
-          {showAISummary && (
+        </div>
+        {showAISummary && (
+          <React.Suspense fallback={<div>Loading AI Summary...</div>}>
             <AIOverlayPanel
               aiSummary={aiSummary}
               summaryError={summaryError}
@@ -235,22 +204,11 @@ const TranscriptDisplay: React.FC<TranscriptDisplayProps> = ({ fetchTranscript }
               getBackgroundColor={getBackgroundColor}
               theme={theme}
             />
-          )}
-        </>
-      ) : (
-        <Button
-          onClick={toggleExpand}
-          className={`w-full h-12 flex items-center justify-center transition-colors duration-300 text-base font-medium ${
-            theme === 'dark'
-              ? 'bg-gray-700 text-white hover:bg-gray-600'
-              : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
-          }`}
-        >
-          Show Transcript
-        </Button>
-      )}
+          </React.Suspense>
+        )}
+      </>
     </div>
   );
 };
 
-export default React.memo(TranscriptDisplay);
+export default TranscriptDisplay;

@@ -1,12 +1,12 @@
-import './tailwind.css';  // This file will contain only Tailwind directives
+console.log('Content script loading');
 
+import './tailwind.css';
 import React from 'react';
-import ReactDOM from 'react-dom';
-import TranscriptDisplay, { TranscriptState, TranscriptDisplayProps } from './components/TranscriptDisplay';
 import { createRoot } from 'react-dom/client';
-import { ThemeProvider } from './components/ThemeProvider';  // Add this import
+import { ThemeProvider } from './components/ThemeProvider';
+import ExpandableTranscript from './components/ExpandableTranscript';
+import { TranscriptState } from './components/TranscriptDisplayTypes';
 
-console.log('Content script loaded');
 
 declare global {
   interface Window {
@@ -75,76 +75,95 @@ function formatTimestamp(seconds: number): string {
   return `${mm}:${ss.toString().padStart(2, '0')}`;
 }
 
-function injectReactComponent(transcriptState: TranscriptState) {
-  console.log('Attempting to inject React component');
-  
-  const inject = () => {
-    const targetElement = document.querySelector('#secondary');
-    if (targetElement) {
-      console.log('Target element found');
-      
-      // Check if the container already exists
-      let container = document.getElementById('yt-transcriber-container-adw');
-      
-      if (!container) {
-        console.log('Creating new container');
-        container = document.createElement('div');
-        container.id = 'yt-transcriber-container-adw';
-        container.style.width = '100%';
-        container.style.marginBottom = '16px';
-        
-        targetElement.prepend(container);
-      } else {
-        console.log('Container already exists, updating content');
-      }
+function setupTranscriptFetching() {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "toggleTranscript") {
+      console.log('Toggling transcript');
+      fetchTranscript().then((transcriptState) => {
+        updateReactComponent(transcriptState);
+      }).catch((error) => {
+        console.error('Error fetching transcript:', error);
+        updateReactComponent({ isLoading: false, transcript: null });
+      });
+    }
+  });
+}
 
-      const root = createRoot(container);
-      root.render(
+function updateReactComponent(transcriptState: TranscriptState) {
+  const container = document.getElementById('yt-transcriber-container-adw');
+  console.log('updateReactComponent', transcriptState);
+  if (container && container.dataset.reactRoot) {
+    const root = createRoot(container);
+    root.render(
+      React.createElement(
+        React.StrictMode,
+        null,
         React.createElement(
-          React.StrictMode,
+          ThemeProvider,
           null,
           React.createElement(
-            ThemeProvider,
-            null,
-            React.createElement(TranscriptDisplay, { fetchTranscript, transcriptState } as TranscriptDisplayProps)
+            React.Suspense,
+            { fallback: React.createElement('div', null, 'Loading...') },
+            React.createElement(ExpandableTranscript, {
+              initialTranscriptState: transcriptState,
+              fetchTranscript: fetchTranscript,
+              AIOverlayPanel: React.lazy(() => import(/* webpackChunkName: "AIOverlayPanel" */ './components/AIOverlayPanel'))
+            })
           )
         )
-      );
-      console.log('React component injected or updated');
-
-      container.dataset.reactRoot = 'true';
-    } else {
-      console.log('Target element not found');
-    }
-  };
-
-  // Clean up existing React root if it exists
-  const existingContainer = document.getElementById('yt-transcriber-container-adw');
-  if (existingContainer && existingContainer.dataset.reactRoot) {
-    const root = createRoot(existingContainer);
-    root.unmount();
-    console.log('Unmounted existing React root');
+      )
+    );
+  } else {
+    injectReactComponent(transcriptState);
   }
+}
 
-  // Try to inject immediately
-  inject();
+function injectReactComponent(transcriptState: TranscriptState) {
+  console.log('Attempting to inject React component');
+  const targetElement = document.querySelector('#secondary');
+  if (targetElement) {
+    console.log('Target element found');
+    
+    let container = document.getElementById('yt-transcriber-container-adw');
+    
+    if (!container) {
+      console.log('Creating new container');
+      container = document.createElement('div');
+      container.id = 'yt-transcriber-container-adw';
+      container.style.width = '100%';
+      container.style.marginBottom = '16px';
+      
+      targetElement.prepend(container);
+    } else {
+      console.log('Container already exists, updating content');
+    }
 
-  // If it fails, set up a MutationObserver to wait for the #secondary element
-  if (!document.querySelector('#secondary')) {
-    console.log('Setting up MutationObserver for #secondary');
-    const observer = new MutationObserver((mutations, obs) => {
-      const targetElement = document.querySelector('#secondary');
-      if (targetElement) {
-        console.log('#secondary found, injecting component');
-        inject();
-        obs.disconnect(); // Stop observing once injected
-      }
-    });
+    const root = createRoot(container);
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    root.render(
+      React.createElement(
+        React.StrictMode,
+        null,
+        React.createElement(
+          ThemeProvider,
+          null,
+          React.createElement(
+            React.Suspense,
+            { fallback: React.createElement('div', null, 'Loading...') },
+            React.createElement(ExpandableTranscript, {
+              initialTranscriptState: transcriptState,
+              fetchTranscript: fetchTranscript,
+              AIOverlayPanel: React.lazy(() => import(/* webpackChunkName: "AIOverlayPanel" */ './components/AIOverlayPanel'))
+            })
+          )
+        )
+      )
+    );
+
+    console.log('React component injected or updated');
+    container.dataset.reactRoot = 'true';
+  } else {
+    console.log('Target element not found');
   }
 }
 
@@ -155,18 +174,26 @@ async function fetchTranscript(): Promise<TranscriptState> {
   }
 
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ action: 'fetchVideoData', videoId }, async (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('Error fetching video data:', chrome.runtime.lastError);
-        resolve({ isLoading: false, transcript: null });
-        return;
-      }
-      if (response.success && response.captionsAvailable) {
-        const parsedCaptions = await fetchAndParseCaptions(response.captionTrackUrl);
-        const formattedTranscript = formatTranscript(parsedCaptions, response.chapters);
-        resolve({ isLoading: false, transcript: formattedTranscript });
-      } else {
-        resolve({ isLoading: false, transcript: null });
+    window.postMessage({ type: 'FROM_CONTENT', action: 'fetchVideoData', videoId }, '*');
+    window.addEventListener('message', async function responseHandler(event) {
+      if (event.source !== window) return;
+      if (event.data.type && event.data.type === 'FROM_BACKGROUND') {
+        if (event.data.action === 'videoDataResponse') {
+          window.removeEventListener('message', responseHandler);
+          const response = event.data.response;
+          if (response.success && response.captionsAvailable) {
+            try {
+              const parsedCaptions = await fetchAndParseCaptions(response.captionTrackUrl);
+              const formattedTranscript = formatTranscript(parsedCaptions, response.chapters);
+              resolve({ isLoading: false, transcript: formattedTranscript });
+            } catch (error) {
+              console.error('Error fetching and parsing captions:', error);
+              resolve({ isLoading: false, transcript: null });
+            }
+          } else {
+            resolve({ isLoading: false, transcript: null });
+          }
+        }
       }
     });
   });
@@ -210,21 +237,16 @@ function main() {
   // Reset extension state (including clearing saved theme)
   resetExtensionState();
 
-  // Check if we're on a YouTube watch page
-  if (location.pathname.startsWith('/watch')) {
-    console.log('On YouTube watch page, fetching transcript');
-    // Fetch transcript and inject React component
-    fetchTranscript().then((transcriptState) => {
-      injectReactComponent(transcriptState);
-    }).catch((error) => {
-      console.error('Error fetching transcript:', error);
-      // Inject React component even if transcript fetch fails
-      injectReactComponent({ isLoading: false, transcript: null });
-    });
+  // Check if we're on a YouTube video page
+  if (isYouTubeVideoPage()) {
+    console.log('On YouTube watch page');
+    setupTranscriptFetching();
+    updateReactComponent({ isLoading: true, transcript: null });
   } else {
     console.log('Not on YouTube watch page');
     // Clean up any existing React components
     cleanupReactComponent();
+    updateExtensionBadge('inactive');
   }
 }
 

@@ -1,2 +1,2 @@
-import './background';
 import './content';
+import './background';
